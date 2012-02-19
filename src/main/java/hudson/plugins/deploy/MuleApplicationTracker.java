@@ -45,12 +45,12 @@ public final class MuleApplicationTracker extends MavenReporter implements Seria
 
         if (project.getAttachedArtifacts() != null && !project.getAttachedArtifacts().isEmpty()) {
             //Record the mule application File as an Action
-            final File file = project.getAttachedArtifacts().get(0).getFile();
+            final String filePath = project.getAttachedArtifacts().get(0).getFile().getPath();
             build.execute(new MavenBuildProxy.BuildCallable<Void, IOException>() {
                 @Override
                 public Void call(final MavenBuild build) throws IOException, InterruptedException {
                     //Mule packaging type attach mule application file first
-                    build.addAction(new MuleApplicationAction(file));
+                    build.addAction(new MuleApplicationAction(filePath));
                     build.save();
                     return null;
                 }

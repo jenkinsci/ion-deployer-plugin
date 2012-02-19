@@ -15,38 +15,21 @@
  */
 package hudson.plugins.deploy;
 
-import hudson.model.Action;
-
-import java.io.File;
+import hudson.model.InvisibleAction;
 
 /**
- * Encapsulate artifact location of a maven mule application as a {#link File}.
+ * Encapsulate artifact location of a maven mule application as a {#link File#getPath()}.
  */
-public final class MuleApplicationAction implements Action {
+public final class MuleApplicationAction extends InvisibleAction {
 
-    private final File file;
+    private final String filePath;
 
-    public MuleApplicationAction(final File file) {
-        this.file = file;
+    public MuleApplicationAction(final String filePath) {
+        this.filePath = filePath;
     }
 
-    public File getFile() {
-        return this.file;
-    }
-
-    @Override
-    public String getIconFileName() {
-        return null;
-    }
-
-    @Override
-    public String getDisplayName() {
-        return null;
-    }
-
-    @Override
-    public String getUrlName() {
-        return null;
+    public String getFilePath() {
+        return this.filePath;
     }
     
 }

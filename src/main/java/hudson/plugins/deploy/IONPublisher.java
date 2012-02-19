@@ -23,6 +23,7 @@ import com.github.jeluard.ion.DomainConnection;
 
 import hudson.AbortException;
 import hudson.Extension;
+import hudson.FilePath;
 import hudson.Launcher;
 import hudson.maven.*;
 import hudson.model.*;
@@ -41,6 +42,7 @@ import javax.servlet.ServletException;
 
 import net.sf.json.JSONObject;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
@@ -49,25 +51,27 @@ import org.kohsuke.stapler.StaplerRequest;
 /**
  * Deploys mule app to iON.
  */
-public class IONPublisher extends Notifier implements Serializable {
+public final class IONPublisher extends Notifier implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private final String accountName;
-    private final String domain;
-    private final String muleVersion;
-    private final int workers;
-    private final long maxWaitTime;
+    //public final so that Jenkins can do its persistence magic
+    public final String accountName;
+    public final String domain;
+    public final String muleVersion;
+    public final int workers;
+    public final long maxWaitTime;
 
     @DataBoundConstructor
     public IONPublisher(final String accountName, final String domain, final String muleVersion, final int workers, final long maxWaitTime) {
-        System.out.println("IONPublisher: "+this.accountName+" "+domain+" "+muleVersion+" "+workers+" "+maxWaitTime);
         //accountName is null when saving with no account configured
-        if (accountName != null && domain == null) {
-            throw new  IllegalArgumentException("null domain");
-        }
-        if (accountName != null && muleVersion == null) {
-            throw new  IllegalArgumentException("null muleVersion");
+        if (accountName != null) {
+            if (domain == null) {
+                throw new  IllegalArgumentException("null domain");
+            }
+            if (muleVersion == null) {
+                throw new  IllegalArgumentException("null muleVersion");
+            }
         }
 
         this.accountName = accountName;
@@ -86,30 +90,40 @@ public class IONPublisher extends Notifier implements Serializable {
     public boolean perform(final AbstractBuild<?, ?> build, final Launcher launcher, final BuildListener listener) throws InterruptedException, IOException {
         //No accountName. Do not fail the build.
         if (this.accountName == null) {
+            listener.getLogger().println(Messages.IONPublisher_NoSelectedAccount());
             return true;
         }
 
-        final List<File> muleApplications = retrieveMuleApplications(build);
+        final List<String> muleApplications = retrieveMuleApplications(build);
         if (muleApplications.isEmpty()) {
             throw new AbortException(Messages.IONPublisher_NoMuleApplication());
         }
         if (muleApplications.size() > 1) {
             throw new AbortException(Messages.IONPublisher_TooManyMuleApplications(muleApplications));
         }
-        final File muleApplication = muleApplications.get(0);
-        //TODO copy file locally?
-        final IONAccount account = getDescriptor().getAccount(this.accountName);
-        final DomainConnection domainConnection = new Connection(account.getUrl(), account.getUsername(), account.getPassword()).on(this.domain);
-        domainConnection.deploy(muleApplication, this.muleVersion, this.workers, this.maxWaitTime);
+
+        final String muleApplication = muleApplications.get(0);
+        final File localMuleApplication = File.createTempFile("jenkins-build-", ".zip");
+        final FilePath filePath = new FilePath(localMuleApplication);
+        final FilePath remoteMuleApplication = build.getWorkspace().child(muleApplication);
+        remoteMuleApplication.copyTo(filePath);
+
+        try {
+            final IONAccount account = getDescriptor().getAccount(this.accountName);
+            final DomainConnection domainConnection = new Connection(account.getUrl(), account.getUsername(), account.getPassword()).on(this.domain);
+            domainConnection.deploy(localMuleApplication, this.muleVersion, this.workers, this.maxWaitTime);
+        } finally {
+            FileUtils.deleteQuietly(localMuleApplication);
+        }
 
         return true;
     }
 
-    protected final List<File> retrieveMuleApplications(final AbstractBuild<?, ?> build) {
-        final List<File> allmuleApplications = new LinkedList<File>();
+    protected final List<String> retrieveMuleApplications(final AbstractBuild<?, ?> build) {
+        final List<String> allmuleApplications = new LinkedList<String>();
         final List<MuleApplicationAction> actions = build.getActions(MuleApplicationAction.class);
         if (!actions.isEmpty()) {
-            allmuleApplications.add(actions.get(0).getFile());
+            allmuleApplications.add(actions.get(0).getFilePath());
         }
 
         if (build instanceof MavenModuleSetBuild) {
@@ -117,7 +131,7 @@ public class IONPublisher extends Notifier implements Serializable {
                 for (final MavenBuild mavenBuild : mavenBuilds) {
                     final List<MuleApplicationAction> moduleActions = mavenBuild.getActions(MuleApplicationAction.class);
                     if (!moduleActions.isEmpty()) {
-                        allmuleApplications.add(moduleActions.get(0).getFile());
+                        allmuleApplications.add(moduleActions.get(0).getFilePath());
                     }
                 }
             }
@@ -166,7 +180,7 @@ public class IONPublisher extends Notifier implements Serializable {
             return true;
         }
 
-        public final FormValidation doTestConnection(@QueryParameter("ionaccount.url") final String url, @QueryParameter("ionaccount.username") final String username, @QueryParameter("ionaccount.password") final String password) {
+        public FormValidation doTestConnection(@QueryParameter("ionaccount.url") final String url, @QueryParameter("ionaccount.username") final String username, @QueryParameter("ionaccount.password") final String password) {
             if (new Connection(url, username, password).test()) {
                 return FormValidation.ok(Messages.IONPublisher_TestConnectionSuccess());
             } else {
@@ -174,26 +188,30 @@ public class IONPublisher extends Notifier implements Serializable {
             }
         }
 
-        public final FormValidation doCheckUsername(@QueryParameter final String username) throws IOException, ServletException {
+        public FormValidation doCheckUsername(@QueryParameter final String username) throws IOException, ServletException {
             if (StringUtils.isBlank(username)) {
                 return FormValidation.error(Messages.IONPublisher_UsernameCheckFailure());
             }
             return FormValidation.ok();
         }
 
-        public final FormValidation doCheckPassword(@QueryParameter final String password) throws IOException, ServletException {
+        public FormValidation doCheckPassword(@QueryParameter final String password) throws IOException, ServletException {
             if (StringUtils.isBlank(password)) {
                 return FormValidation.error(Messages.IONPublisher_PasswordCheckFailure());
             }
             return FormValidation.ok();
         }
 
-        public final FormValidation doCheckDomain(@QueryParameter final String domain, @QueryParameter final String accountName) throws IOException, ServletException {
+        public FormValidation doCheckDomain(@QueryParameter final String domain, @QueryParameter final String accountName) throws IOException, ServletException {
             if (StringUtils.isBlank(domain)) {
                 return FormValidation.error(Messages.IONPublisher_DomainCheckFailure());
             }
             final IONAccount account = getAccount(accountName);
-            if (listDomains(account.getUrl(), account.getUsername(), account.getPassword()).contains(domain)) {
+            final Connection connection = new Connection(account.getUrl(), account.getUsername(), account.getPassword());
+            if (!connection.test()) {
+                return FormValidation.error(Messages.IONPublisher_InvalidAccount());
+            }
+            if (listDomains(connection).contains(domain)) {
                 return FormValidation.ok();
             }
             return FormValidation.error(Messages.IONPublisher_DomainCheckFailure());
@@ -211,27 +229,30 @@ public class IONPublisher extends Notifier implements Serializable {
             final String password = "";//staplerRequest.getParameter("password");
 
             final AutoCompletionCandidates candidates = new AutoCompletionCandidates();
-            for (final String domain : listDomains(url, username, password)) {
-                if (domain.startsWith(value)) {
-                    candidates.add(domain);
+            final Connection connection = new Connection(url, username, password);
+            if (!connection.test()) {
+                for (final String domain : listDomains(connection)) {
+                    if (domain.startsWith(value)) {
+                        candidates.add(domain);
+                    }
                 }
             }
             return candidates;
         }
 
-        protected final List<String> listDomains(final String url, final String username, final String password) {
+        protected List<String> listDomains(final Connection connection) {
             final List<String> domains = new LinkedList<String>();
-            for (final Application application : new Connection(url, username, password).list()) {
+            for (final Application application : connection.list()) {
                 domains.add(application.getDomain());
             }
             return domains;
         }
 
-        public final IONAccount[] getAccounts() {
+        public IONAccount[] getAccounts() {
             return this.accounts.toArray(new IONAccount[this.accounts.size()]);
         }
 
-        public final IONAccount getAccount(final String name) {
+        public IONAccount getAccount(final String name) {
             for (final IONAccount account : getAccounts()) {
                 if (account.getAccountName().equals(name)) {
                     return account;
@@ -241,7 +262,7 @@ public class IONPublisher extends Notifier implements Serializable {
         }
 
         @Override
-        public final boolean isApplicable(final Class<? extends AbstractProject> jobType) {
+        public boolean isApplicable(final Class<? extends AbstractProject> jobType) {
             return jobType.equals(MavenModule.class) || jobType.equals(MavenModuleSet.class);
         }
 
