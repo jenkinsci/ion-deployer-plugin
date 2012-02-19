@@ -1,0 +1,40 @@
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define"
+         xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+  <j:choose>
+    <j:when test="${descriptor.accounts.size() &gt; 0}">
+      <f:entry title="${%account}">
+        <select class="setting-input" name="ionaccount.accountName">
+          <j:forEach var="s" items="${descriptor.accounts}">
+            <f:option selected="${s.accountName==instance.accountName}">${s.accountName}</f:option>
+          </j:forEach>
+        </select>
+      </f:entry>
+      <f:entry title="${%domain}">
+        <f:textbox name="ionaccount.domain" value="${instance.domain}" 
+          checkUrl="'${rootURL}/publisher/IONPublisher/checkDomain?domain='+encodeURIComponent(this.value)+'&amp;accountName='+encodeURIComponent(Form.findMatchingInput(this, 'ionaccount.accountName').value)" />
+        <!-- TODO add auto complete support autoCompleteField="domains" /-->
+      </f:entry>
+      <!-- TODO add button to create domain -->
+      <f:section title="${%advanced}">
+        <f:advanced>
+          <f:entry title="${%version}">
+            <select name="ionaccount.muleVersion" value="${instance.muleVersion}">
+              <option value="3.2.1">3.2.1</option>
+            </select>
+          </f:entry> 
+          <f:entry title="${%workers}">
+            <f:textbox name="ionaccount.workers" value="${instance.workers}" default="1" />
+          </f:entry>
+          <f:entry title="${%maxWaitTimeout}">
+            <f:textbox name="ionaccount.maxWaitTimeout" value="${instance.maxWaitTimeout}" default="120000" />
+          </f:entry>
+        </f:advanced>
+      </f:section>
+    </j:when>
+    <j:otherwise>
+      <f:entry>
+        <p>${%noaccounts}</p>
+      </f:entry>
+    </j:otherwise>
+  </j:choose>
+</j:jelly>

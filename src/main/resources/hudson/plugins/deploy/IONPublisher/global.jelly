@@ -1,0 +1,25 @@
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+  <f:section title="${%ion}">
+    <f:entry title="${%accounts}" description="">
+      <f:repeatable var="account" items="${descriptor.accounts}">
+        <table width="100%">
+          <f:entry title="${%url}">
+            <f:textbox name="ionaccount.url" value="${account.url}" default="https://muleion.com/" />
+          </f:entry>
+          <f:entry title="${%username}">
+            <f:textbox name="ionaccount.username" value="${account.username}" checkUrl="'${rootURL}/publisher/IONPublisher/checkUsername?username='+encodeURIComponent(this.value)" />
+          </f:entry>
+          <f:entry title="${%password}" field="password">
+            <f:password name="ionaccount.password" value="${account.password}" checkUrl="'${rootURL}/publisher/IONPublisher/checkPassword?password='+encodeURIComponent(this.value)" />
+          </f:entry>
+          <f:validateButton title="${%test}" progress="${%testing}" method="testConnection" with="ionaccount.url,ionaccount.username,ionaccount.password" />
+          <f:entry title="">
+            <div align="right">
+              <f:repeatableDeleteButton />
+            </div>
+          </f:entry>
+        </table>
+      </f:repeatable>
+    </f:entry>
+  </f:section>
+</j:jelly>
