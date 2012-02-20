@@ -76,6 +76,7 @@
             <exclude>NOTICE</exclude>
             <exclude>licenses/*</exclude>
             <exclude>**/dependency-reduced-pom.xml</exclude>
+            <exclude>work/**</exclude>
           </excludes>
         </configuration>
         <executions>
