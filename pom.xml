@@ -44,9 +44,9 @@
   </developers>
 
   <scm>
-    <connection>scm:git:git@github.com:jeluard/ion-deployer-plugin</connection>
-    <developerConnection>scm:git:git@github.com:jeluard/ion-deployer-plugin</developerConnection>
-    <url>scm:git:git@github.com:jeluard/ion-deployer-plugin</url>
+    <connection>scm:git:git://github.com/jenkinsci/ion-deployer-plugin.git</connection>
+    <developerConnection>scm:git:git@github.com:jenkinsci/ion-deployer-plugin.git</developerConnection>
+    <url>https://github.com/jenkinsci/ion-deployer-plugin</url>
   </scm>
 
   <issueManagement>
@@ -99,5 +99,12 @@
       </plugin>
     </plugins>
   </build>
+
+  <repositories>
+    <repository>
+      <id>jenkins-ci</id>
+      <url>http://maven.jenkins-ci.org/content/groups/artifacts/</url>
+    </repository>
+  </repositories>
 
 </project>
